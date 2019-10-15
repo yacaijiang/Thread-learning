@@ -1,0 +1,18 @@
+#unique_lock详解</br>
+#unique_lock取代lock_guard</br>
+
+
+# unique_lock的第二个参数</br>
+```
+  std::adopt_lock
+  std::try_to_lock
+  std::defer_lock
+```
+unique_lock的成员函数</br>
+```
+  lock（）
+  unlock（）
+  try_lock()
+  release（）//返回unique_lock中调用线程的指针；
+```
+unique_lock所有权传递</br>
