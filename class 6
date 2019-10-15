@@ -1,18 +1,68 @@
-#unique_lock详解</br>
-#unique_lock取代lock_guard</br>
+#单例设计模式共享数据分析、解决、call_once</br>
+
+#设计模式大概谈</br>
+设计模式：代码的写法：程序灵活，维护方便，其他人难以接手</br>
 
 
-# unique_lock的第二个参数</br>
+#单例设计模式</br>
+使用频率较高
+单例：整个项目中，有某个或者某些特殊的类、属于该类的对象，我只能创建一个，不能创建多了</br>
+单例类：
 ```
-  std::adopt_lock
-  std::try_to_lock
-  std::defer_lock
+class MyCAS {//单例类
+private:
+	MyCAS() {}//私有化构造函数
+private:
+	static MyCAS *m_instance;//静态成员变量
+public:
+	static MyCAS *GetIntance() {
+		if (m_instance == NULL) {
+			m_instance = new MyCAS();
+			static CASRealse c;
+		}
+		return m_instance;
+	}
+	class CASRealse {//类中套类，释放对象
+	public:
+		CASRealse() {
+			if (MyCAS::m_instance) {
+				delete MyCAS::m_instance;
+				MyCAS::m_instance = NULL;
+			}
+		}
+
+	};
+	void func() {
+		std::cout << " test" << std::endl;
+	}
+};
+//类静态变量初始化
+MyCAS * MyCAS::m_instance = NULL;
+//两种使用方式
+	MyCAS *p_a = MyCAS::GetIntance();
+  p_a->func();//方法一
+	MyCAS::GetIntance()->func();//方法二
 ```
-unique_lock的成员函数</br>
+
+
+#单例设计模式共享数据问题分析、解决</br>
+问题： 需要我们自己创建的线程中创建MyCAS这个单例类的对象，该类型线程不止一个</br>
+可能需要GetIntance（）这种函数要互斥；改写GetIntance（）函数</br>
 ```
-  lock（）
-  unlock（）
-  try_lock()
-  release（）//返回unique_lock中调用线程的指针；
+  std::mutex rescource_mutex;
+	static MyCAS *GetIntance() {
+		if (m_instance == NULL) {//双重锁定
+			std::unique_lock<std::mutex> mymutex(rescource_mutex);
+			if (m_instance == NULL) {
+				m_instance = new MyCAS();//共享数据区
+				static CASRealse c;
+			}
+		}
+		return m_instance;
+	}
 ```
-unique_lock所有权传递</br>
+#std::call_once()</br>c++11引入的函数，call_once()jub该函数第二个参数是一个函数名a（）；</br>
+call_once（）功能是能够保证函数a（）只被调用一次；</br>
+call_once()具备互斥量能力，比互斥量消耗更少资源；</br>
+call_once()与一个标记once_flag（std::once_flag ）结合使用，通过该标记来判断函数是否执行；</br>
+
