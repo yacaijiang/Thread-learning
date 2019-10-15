@@ -1,0 +1,90 @@
+#互斥量、死锁</br>
+
+#互斥量（mutex）的基本概念</br>
+保护共享数据：操作时，某线程用代码把共享数据锁住，其他想操作共享数据的线程必须等待解锁；</br>
+互斥量是一个类对象，理解成一把锁，多线程尝试用lock（）成员函数加锁，只有一个线程可以锁定成功（成功标志为lock（）返回true)</br>
+#互斥量的用法</br>
+lock（）、unlock（）</br>
+使用顺序：先使用lock（）加锁共享数据，再使用unlock（）解锁；</br>
+使用注意：必须成对使用，即每次上锁操作lock（）和unlock（）各调用一次；</br>
+加入互斥量后的线程处理：
+```
+#include "pch.h"
+#include <iostream>
+#include<thread>
+#include<string>
+#include<map>
+#include<vector>
+#include<mutex>
+#include<list>
+class A {
+public:
+	//收到消息放入一个队列的线程中
+	void inMsgRecvQueue() {
+		for (int i = 0; i < 100000; ++i) {
+			std::cout << "inMsgRecvQueue(),插入一个元素" << i << std::endl;
+			my_mutex.lock();//加锁
+			msgRecvQueue.push_back(i);
+			my_mutex.unlock();//解锁
+		}
+	}
+	bool outMsgLULProc(int &command) {
+		my_mutex.lock();//加锁
+		if (!msgRecvQueue.empty()) {
+			//消息队列不空
+			int command = msgRecvQueue.front();//返回第一个元素
+			msgRecvQueue.pop_front();//移除第一个
+			my_mutex.unlock();//解锁
+			return true;
+		}
+		my_mutex.unlock();//解锁
+		return false;
+	}
+
+	//把消息从队列中取出
+	void outMsgRecvQueue() {
+		int command = 0;
+		for (int i = 0; i < 100000; ++i) {
+			bool result = outMsgLULProc(command);
+			if (result) {
+				//处理数据...
+			}
+			else {
+				std::cout << "outMsgRecvQueue(), 非空" << i << std::endl;
+			}
+		}
+	}
+private:
+	std::list<int> msgRecvQueue;//消息队列
+	std::mutex my_mutex;  //new 互斥量用于保护共享数据
+};
+int main()
+{
+
+	A myobja;
+	std::thread myOutMsgObj(&A::outMsgRecvQueue, &myobja);
+	std::thread myInMsgObj(&A::inMsgRecvQueue, &myobja);
+	myInMsgObj.join();
+	myOutMsgObj.join();
+
+	std::cout << "middle" << std::endl;
+	return 0;
+}
+```
+
+防止忘记unlock（），引入了std::lock_guard()类模板；</br>
+#std::lock_guard()类模板，取代lock（）和unlock（）std::lock_guard()类模板</br>
+
+
+
+#死锁</br>
+一般解决方案：</br>
+多个互斥量上锁调用顺序一致</br>
+std::lock()函数模板</br>
+用于处理多个互斥量，不会因为顺序问题导致死锁</br>
+std::lock_guard()和std::adopt_lock参数模板</br>
+
+
+
+
+
