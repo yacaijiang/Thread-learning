@@ -1,0 +1,57 @@
+#互斥量（mutex）<br/>
+#unique_lock()取代lock_guard()<br/>
+unique_lock():<br/>
+
+unique_lock()第二个参数；<br/>
+
+```
+std::mutex my_mutex;
+std::lock_guard<std::mutex> myguard(my_mutex,std::adopt_lock);//adopt_lock标记作用；
+
+```
+
+#std::adopt_lock:表示这个互斥量已经被lock（你必须要把互斥量提前lock了，否则会报异常）<br/>
+unique_lock中使用该函数表示构造函数中不需要lock；<br/>
+
+```
+std::mutex my_mutex;
+my_mutex.lock();//必须在使用前先加锁；
+std::unique_lock<std::mutex> myguard(my_mutex,std::adopt_lock);//adopt_lock标记作用；
+```
+
+#std::try_to_lock<br/>
+
+尝试使用mutex的lock（）锁定mutex，如果没有锁定成功，也会立即返回，并不会阻塞<br/>
+
+```
+std::mutex my_mutex;
+//my_mutex.lock();//在使用前一定不能主动加锁；
+std::unique_lock<std::mutex> my_guard(my_mutex,std::try_to_lock);//
+```
+
+#std::defer_lock<br/>
+在使用前一定不能主动lock；<br/>
+
+```
+std::mutex my_mutex;
+std::unique_lock<std::mutex> my_guard(my_mutex,std::defer_lock);//
+std::my_guard.lock();//不用主动unlock,my_guard结束后自带解锁；
+```
+
+
+#unique_lock()成员函数<br/>
+lock();<br/>
+unlock();<br/>
+try_lock();//尝试给互斥量加锁，如果拿不到锁，返回false；<br/>
+release();//返回所管理的mutex对象指针，并释放所有权；若当前mutex对象指针仍在lock状态下，调用该函数后，需要手动对mutex对象进行<br/>
+unique_lock的所有权传递：mutex<br/>
+
+```
+std::unique_lock<std::mutex> my_guard(my_mutex); //my_guard拥有my_mutex的所有权
+std::unique_lock<std::mutex> my_guard_test(std::move(my_guard));//my_guard可以转移my_mutex的所有权
+```
+
+#互斥量的用法<br/>
+
+
+#死锁<br/>
