@@ -1,0 +1,216 @@
+#单例设计模式共享数据分析、解决、call_once</br>
+
+
+#设计模式概述</br>
+#设计模式：代码的写法；使得程序灵活，维护方便，其他人接管、阅读代码很难；</br>
+
+产生的原因：应用大型项目时，将大型的项目经验拆分成多个小模块，总结整理成设计模式
+
+#单例设计模式</br>
+使用频率较高的模式</br>
+单例：整个项目中，有某个或者某些特殊的类，属于该类的对象，只能创建一个，多了不能创建</br>
+单例类：</br>
+
+```
+#include <iostream>
+#include <thread>
+#include <Windows.h>
+
+using namespace std;
+class MyCAS {
+private:
+	MyCAS() {}//私有化构造函数
+private:
+	static MyCAS *m_instance;//类静态成员变量
+public:
+	static MyCAS *GetInstance()
+	{
+		if (m_instance == NULL)
+		{
+			m_instance = new MyCAS();
+			static RecoverMyCAS rc1;
+		}
+		return m_instance;
+	}
+	class RecoverMyCAS//类中套类，用于释放对象
+	{
+	public:
+		~RecoverMyCAS()//类的析构函数中
+		{
+			if (MyCAS::m_instance)
+			{
+				delete MyCAS::m_instance;
+				MyCAS::m_instance = NULL;
+			}
+		}
+	};
+	void func() {
+		cout << "test" << endl;
+		Sleep(1000);
+	}
+};
+//类静态变量初始化
+MyCAS *MyCAS::m_instance = NULL;
+int main()
+{
+	MyCAS *p_a = MyCAS::GetInstance();//创建一个对象，返回该类的对象指针
+	p_a->func();//调用类方法
+	MyCAS::GetInstance()->func();//调用类方法
+	return 0;
+
+}
+```
+#单例设计模式共享数据问题分析、解决</br>
+#面临的问题：需要在我们自己创建的线程中创建MyCAS这个单例类的对象，这个线程不止一个（最少2个）</br>
+#可能面临GetInstance互斥的问题GetInstance</br>
+```
+#include <iostream>
+#include <thread>
+#include <Windows.h>
+#include<mutex>
+using namespace std;
+std::mutex resource_mutex;
+class MyCAS {
+private:
+	MyCAS() {}//私有化构造函数
+private:
+	static MyCAS *m_instance;//类静态成员变量
+public:
+	static MyCAS *GetInstance()
+	{
+		//提高效率
+		//a）if (m_instance ！= NULL)，则表示m_instance已经被new过了；
+		//b）if (m_instance == NULL)，不代表m_instance一定没被new过；
+		if (m_instance == NULL)//双重锁定（双重检查）
+		{
+			std::unique_lock<std::mutex> mymutex(resource_mutex);//自动加锁
+			if (m_instance == NULL)
+			{
+				m_instance = new MyCAS();
+				static RecoverMyCAS rc1;
+			}
+		}
+		return m_instance;
+	}
+	class RecoverMyCAS//类中套类，用于释放对象
+	{
+	public:
+		~RecoverMyCAS()//类的析构函数中
+		{
+			if (MyCAS::m_instance)
+			{
+				delete MyCAS::m_instance;
+				MyCAS::m_instance = NULL;
+			}
+		}
+	};
+	void func() {
+		cout << "test" << endl;
+		Sleep(1000);
+	}
+};
+//类静态变量初始化
+MyCAS *MyCAS::m_instance = NULL;
+void mythread()
+{
+	cout << "start" << endl;
+	MyCAS *p_a=MyCAS::GetInstance();
+	cout << "end" << endl;
+	return;
+}
+int main()
+{
+	MyCAS *p_a = MyCAS::GetInstance();//创建一个对象，返回该类的对象指针
+	p_a->func();//调用类方法
+	MyCAS::GetInstance()->func();//调用类方法
+	//如下两个线程存在
+	std::thread myobj1(mythread);
+	std::thread myobj2(mythread);
+	myobj1.join();
+	myobj2.join();
+	return 0;
+}
+
+```
+
+#std::call_once()：c++11引入的函数，该函数的第二个参数是一个函数名a（）；</br>
+call_once功能是能够保证函数a（）只被调用一次；</br>
+call_once具备互斥功能，效率比互斥量消耗更少的资源;</br>
+call_once需要与一个标记结合使用，这个标记std::once_flag;其实once_flag是一个结构；</br>
+call_once就是通过这个标记来决定对应的函数a（）是否执行，调用call_once成功后，call_once把这个标记设置为一种已调用状态；后续再次调用call_once，只要once_flag被设置为了已调用状态，那么对应的函数不会被调用；</br>
+```
+#include <iostream>
+#include <thread>
+#include <Windows.h>
+#include<mutex>
+using namespace std;
+std::mutex resource_mutex;
+std::once_flag g_flag;
+class MyCAS {
+	static void CreateInstance()//只被调用一次
+	{
+		m_instance = new MyCAS();
+		static RecoverMyCAS rc1;
+	}
+private:
+	MyCAS() {}//私有化构造函数
+private:
+	static MyCAS *m_instance;//类静态成员变量
+public:
+	static MyCAS *GetInstance()
+	{
+		//提高效率
+		//a）if (m_instance ！= NULL)，则表示m_instance已经被new过了；
+		//b）if (m_instance == NULL)，不代表m_instance一定没被new过；
+		//if (m_instance == NULL)//双重锁定（双重检查）
+		//{
+		//	std::unique_lock<std::mutex> mymutex(resource_mutex);//自动加锁
+		//	if (m_instance == NULL)
+		//	{
+		//		m_instance = new MyCAS();
+		//		static RecoverMyCAS rc1;
+		//	}
+		//}
+		std::call_once(g_flag, CreateInstance);//两个线程同时执行到这里时，其中一个线程需要邓另外一个线程执行完毕
+		return m_instance;
+	}
+	class RecoverMyCAS//类中套类，用于释放对象
+	{
+	public:
+		~RecoverMyCAS()//类的析构函数中
+		{
+			if (MyCAS::m_instance)
+			{
+				delete MyCAS::m_instance;
+				MyCAS::m_instance = NULL;
+			}
+		}
+	};
+	void func() {
+		cout << "test" << endl;
+		Sleep(1000);
+	}
+};
+//类静态变量初始化
+MyCAS *MyCAS::m_instance = NULL;
+void mythread()
+{
+	cout << "start" << endl;
+	MyCAS *p_a=MyCAS::GetInstance();
+	cout << "end" << endl;
+	return;
+}
+int main()
+{
+	MyCAS *p_a = MyCAS::GetInstance();//创建一个对象，返回该类的对象指针
+	p_a->func();//调用类方法
+	MyCAS::GetInstance()->func();//调用类方法
+	//如下两个线程存在
+	std::thread myobj1(mythread);
+	std::thread myobj2(mythread);
+	myobj1.join();
+	myobj2.join();
+	return 0;
+}
+
+```
